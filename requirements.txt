@@ -1,0 +1,9 @@
+torch~=2.0.1+cu118
+numpy~=1.24.1
+scikit-learn~=1.3.0
+torchtext~=0.15.2
+tqdm~=4.65.0
+nltk~=3.8.1
+torchmetrics~=1.0.3
+torchsummaryx~=1.1.0
+thop~=0.1.1-2209072238
