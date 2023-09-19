@@ -1,35 +1,43 @@
+from assembler.data import simple_pipeline
+
+
 reproducibility = {
     'seed': 42
 }
 
 vocab = {
-    'corpus_ru': 'data/corpus.en_ru.1m.ru',
-    'corpus_en': 'data/corpus.en_ru.1m.en',
-    'min_freq_ru': 5,
-    'min_freq_en': 5,
-    'max_tokens_ru': 25000,
+    'train_corpus_en': 'data/train.en',
+    'train_corpus_de': 'data/train.de',
+    'min_freq_en': 2,
+    'min_freq_de': 2,
     'max_tokens_en': 25000,
+    'max_tokens_de': 25000,
     'special_tokens':
-        {
-            'padding': '<pad>',
-            'unknown': '<unk>',
-            'start': '<bos>',
-            'end': '<eos>',
-        },
-    'path_ru': 'data/ru.pth',
-    'path_en': 'data/en.pth',
+    {
+        'padding': '<pad>',
+        'unknown': '<unk>',
+        'start': '<bos>',
+        'end': '<eos>',
+    },
+    'path_en': 'data/en.vocab',
+    'path_de': 'data/de.vocab',
 }
 
 dataset = {
-    'corpus_ru': vocab['corpus_ru'],
-    'corpus_en': vocab['corpus_en'],
-    'vocab_ru': vocab['path_ru'],
+    'train_corpus_en': 'data/train.en',
+    'train_corpus_de': 'data/train.de',
+    'val_corpus_en': 'data/val.en',
+    'val_corpus_de': 'data/val.de',
+    'test_corpus_en': 'data/test.en',
+    'test_corpus_de': 'data/test.de',
     'vocab_en': vocab['path_en'],
-    'translate_to': 'ru',
+    'vocab_de': vocab['path_de'],
+    'translate_to': 'de',
     'max_seq_len': 60,
     'pad_token': vocab['special_tokens']['padding'],
     'start_token': vocab['special_tokens']['start'],
     'end_token': vocab['special_tokens']['end'],
+    'preprocess': simple_pipeline,
 }
 
 dataset_split = {
@@ -42,9 +50,9 @@ dataloader = {
     'num_workers': 2}
 
 model = {
-    'dim_model': 128,
-    'num_layers': 3,
-    'num_heads': 4,
+    'dim_model': 256,
+    'num_layers': 4,
+    'num_heads': 8,
     'dim_ff': 2048,
     'dropout': 0.1,
     'max_seq_len': dataset['max_seq_len'],
@@ -52,16 +60,16 @@ model = {
     'device': 'cuda:0',
 
     'criterion': {'name': 'CrossEntropyLoss',
-                  'params': {'ignore_index': 0}},
+                  'args': {'ignore_index': 0}},
 
     'optimizer': {'name': 'Adam',
-                  'params': {'lr': 1e-3,
-                             'betas': (0.9, 0.98),
-                             'eps': 1e-9}},
+                  'args': {'lr': 0.0001,
+                           'betas': (0.9, 0.98),
+                           'eps': 1e-9}},
 
-    'train_config': {'epochs': 15,
+    'train_config': {'epochs': 20,
                      'clip_gradient': 1.0},
 
     'val_config': {'metric': {'name': 'BLEUScore',
-                              'params': {}}}
+                              'args': {}}}
 }

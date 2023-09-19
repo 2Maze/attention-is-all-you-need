@@ -3,4 +3,5 @@ runs
 weights
 *.pth
 *.en
-*.ru
+*.de
+*.vocab

@@ -1,7 +1,7 @@
 import argparse
 
 from assembler import load_config
-from assembler.data import get_dataloaders, WordIDMapper
+from assembler.data import get_dataloaders, get_mapper
 
 
 def parse_args():
@@ -11,26 +11,21 @@ def parse_args():
                         type=str,
                         help='Path to model config',
                         default='configs/standard.py')
-    parser.add_argument('-b',
-                        '--batch-size',
-                        type=int,
-                        help='Batch size of output',
-                        default=5)
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
     config = load_config(args.config)
-    config.dataloader['batch_size'] = args.batch_size
-    train_dataloader, val_dataloader = get_dataloaders(config)
-    mapper = WordIDMapper(config)
-    ru, en = next(iter(train_dataloader))
-    print('_______________________________')
-    for i in range(len(ru)):
-        print(f'ru {"(trg)" if "ru" == config.dataset["translate_to"] else "(src)"}: ', mapper.ruids2word(ru[i]))
-        print(f'en {"(trg)" if "en" == config.dataset["translate_to"] else "(src)"}: ', mapper.enids2word(en[i]))
-        print('_______________________________')
+    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(config)
+    mapper = get_mapper(config)
+    src, trg = next(iter(train_dataloader))
+    print('_________________________')
+    for s, t in zip(mapper.src2words(src), mapper.trg2words(trg)):
+        print('src: {}'.format(s))
+        print('trg: {}'.format(t))
+        print('_________________________')
+    print('src batch shape {} \ntrg batch shape {}'.format(src.shape, trg.shape))
 
 
 if __name__ == '__main__':

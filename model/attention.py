@@ -8,12 +8,15 @@ from typing import Optional
 
 
 class ScaledDotProductAttention(nn.Module):
-    def __init__(self, scale: int, dropout: float):
+    def __init__(self,
+                 scale: int,
+                 dropout: float):
         super(ScaledDotProductAttention, self).__init__()
         self.scale = scale
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, query: Tensor,
+    def forward(self,
+                query: Tensor,
                 key: Tensor,
                 value: Tensor,
                 mask: Optional[Tensor] = None) -> Tensor:

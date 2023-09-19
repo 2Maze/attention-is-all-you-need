@@ -12,6 +12,7 @@ def set_seed(config: ModuleType):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
     print(f'Global seed set to {seed}')
 
 

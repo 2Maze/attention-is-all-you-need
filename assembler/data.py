@@ -1,47 +1,34 @@
 import torch
 import re
+import string
+import spacy
 
+from typing import Sequence, Union
 from torch import Tensor
 from types import ModuleType
 from torch.utils.data import DataLoader
-from data.dataset import YandexTranslateCorpus
-from torch.utils.data import Subset
-from sklearn.model_selection import train_test_split
+from data.dataset import Multi30k
 from torchtext.vocab import Vocab, vocab
 from collections import Counter
 from tqdm import tqdm
-from nltk.tokenize import word_tokenize
+from torch.utils.data import Dataset
+from torch.nn.utils.rnn import pad_sequence
+
+
+spacy_en = spacy.load('en_core_web_md')
+spacy_de = spacy.load('de_core_news_md')
 
 
 class WordIDMapper:
     def __init__(self, config: ModuleType) -> None:
         self.config = config
-        self.ru_vocab = torch.load(config.vocab['path_ru'])
         self.en_vocab = torch.load(config.vocab['path_en'])
-        self.ru_id2word = self.ru_vocab.get_itos()
+        self.de_vocab = torch.load(config.vocab['path_de'])
         self.en_id2word = self.en_vocab.get_itos()
+        self.de_id2word = self.de_vocab.get_itos()
+        self.translate_to = self.config.dataset['translate_to']
 
-    def ruids2word(self, ids: Tensor):
-        assert ids.dim() == 1 or ids.dim() == 2
-        if ids.dim() == 1:
-            tokens = []
-            for ruid in ids:
-                token = self.ru_id2word[ruid]
-                if token not in [self.config.vocab['special_tokens']['padding']]:
-                    tokens.append(token)
-            return ' '.join(tokens)
-        elif ids.dim() == 2:
-            batch = []
-            for sent_id in ids:
-                tokens = []
-                for ruid in sent_id:
-                    token = self.ru_id2word[ruid]
-                    if token not in [self.config.vocab['special_tokens']['padding']]:
-                        tokens.append(token)
-                batch.append(' '.join(tokens))
-            return batch
-
-    def enids2word(self, ids: Tensor):
+    def enids2words(self, ids: Tensor) -> Union[list, str]:
         assert ids.dim() == 1 or ids.dim() == 2
         if ids.dim() == 1:
             tokens = []
@@ -61,98 +48,65 @@ class WordIDMapper:
                 batch.append(' '.join(tokens))
             return batch
 
+    def deids2words(self, ids: Tensor) -> Union[list, str]:
+        assert ids.dim() == 1 or ids.dim() == 2
+        if ids.dim() == 1:
+            tokens = []
+            for deid in ids:
+                token = self.de_id2word[deid]
+                if token not in [self.config.vocab['special_tokens']['padding']]:
+                    tokens.append(token)
+            return ' '.join(tokens)
+        elif ids.dim() == 2:
+            batch = []
+            for sent_id in ids:
+                tokens = []
+                for deid in sent_id:
+                    token = self.de_id2word[deid]
+                    if token not in [self.config.vocab['special_tokens']['padding']]:
+                        tokens.append(token)
+                batch.append(' '.join(tokens))
+            return batch
 
-def build_dataset(config: ModuleType) -> YandexTranslateCorpus:
-    dataset = YandexTranslateCorpus(**config.dataset)
-    return dataset
+    def src2words(self, ids: Tensor) -> Union[list, str]:
+        if self.translate_to == 'de':
+            return self.enids2words(ids)
+        elif self.translate_to == 'en':
+            return self.deids2words(ids)
+        else:
+            raise RuntimeError('Error in translate_to')
 
-
-def split_dataset(config: ModuleType,
-                  dataset: YandexTranslateCorpus
-                  ) -> tuple[Subset[YandexTranslateCorpus], Subset[YandexTranslateCorpus]]:
-    reproducibility_config = config.reproducibility
-    dataset_split_config = config.dataset_split
-
-    train_indices, val_indices = train_test_split(range(len(dataset)),
-                                                  train_size=dataset_split_config['train'],
-                                                  test_size=dataset_split_config['validation'],
-                                                  random_state=reproducibility_config['seed'],
-                                                  )
-    return Subset(dataset, train_indices), Subset(dataset, val_indices)
-
-
-def build_dataloaders(config: ModuleType,
-                      datasets: tuple[Subset[YandexTranslateCorpus], Subset[YandexTranslateCorpus]]) -> tuple[DataLoader, DataLoader]:
-    dataloader_config = config.dataloader
-    train_dataset, val_dataset = datasets
-    return (DataLoader(train_dataset,
-                       shuffle=True,
-                       batch_size=dataloader_config['batch_size'],
-                       num_workers=dataloader_config['num_workers']),
-            DataLoader(val_dataset,
-                       shuffle=False,
-                       batch_size=dataloader_config['batch_size'],
-                       num_workers=dataloader_config['num_workers']))
-
-
-def get_datasets(config) -> tuple[Subset[YandexTranslateCorpus], Subset[YandexTranslateCorpus]]:
-    return split_dataset(config, build_dataset(config))
-
-
-def get_dataloaders(config) -> tuple[DataLoader, DataLoader]:
-    return build_dataloaders(config, get_datasets(config))
+    def trg2words(self, ids: Tensor) -> Union[list, str]:
+        if self.translate_to == 'de':
+            return self.deids2words(ids)
+        elif self.translate_to == 'en':
+            return self.enids2words(ids)
+        else:
+            raise RuntimeError('Error in translate_to')
 
 
-def clean_text_ru(text: str) -> str:
-    text = re.sub(r'[^a-zA-Zа-яА-Я\s]', '', text)
-    text = re.sub(r'\s+', ' ', text)
-    text = text.lower()
-    return text.strip()
-
-
-def clean_text_eng(text: str) -> str:
-    text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
-    text = re.sub(r'\s+', ' ', text)
-    text = text.lower()
+def preprocessing_text(text):
+    text = text.lower().strip()
+    text = re.sub(f'[{string.punctuation}\n]', '', text)
     return text
 
 
-def clean_text(text: str, language: str) -> str:
-    if language == 'ru':
-        output = clean_text_ru(text)
-    elif language == 'en':
-        output = clean_text_eng(text)
-    else:
-        raise RuntimeError(f'Language - {language} not in support languages!')
-    return output
+def tokenize_en(text):
+    return [tok.text for tok in spacy_en.tokenizer(text)]
 
 
-def tokenize_ru(text: str) -> list:
-    return word_tokenize(text, language='russian')
+def tokenize_de(text):
+    return [tok.text for tok in spacy_de.tokenizer(text)]
 
 
-def tokenize_eng(text: str) -> list:
-    return word_tokenize(text, language='english')
+def simple_pipeline(en_text: str,
+                    de_text: str) -> tuple[list, list]:
+    clean_en = preprocessing_text(en_text)
+    clean_de = preprocessing_text(de_text)
 
-
-def tokenize(text: str, language: str) -> list:
-    if language == 'ru':
-        output = tokenize_ru(text)
-    elif language == 'en':
-        output = tokenize_eng(text)
-    else:
-        raise RuntimeError(f'Language - {language} not in support languages!')
-    return output
-
-
-def simple_pipeline(ru_text: str,
-                    en_text: str) -> tuple[list, list]:
-    clean_ru = clean_text(ru_text, language='ru')
-    clean_en = clean_text(en_text, language='en')
-
-    tokens_ru = tokenize(clean_ru, language='ru')
-    tokens_en = tokenize(clean_en, language='en')
-    return tokens_ru, tokens_en
+    tokens_en = tokenize_en(clean_en)
+    tokens_de = tokenize_de(clean_de)
+    return tokens_en, tokens_de
 
 
 def save_vocab(vocabulary: Vocab,
@@ -161,23 +115,22 @@ def save_vocab(vocabulary: Vocab,
 
 
 def build_vocab(config: ModuleType) -> None:
-    counter_ru = Counter()
     counter_en = Counter()
+    counter_de = Counter()
 
-    with open(config.vocab['corpus_ru'], 'r') as corpus_1, open(config.vocab['corpus_en'], 'r') as corpus_2:
-        ru_lines = corpus_1.readlines()
-        en_lines = corpus_2.readlines()
-        assert len(ru_lines) == len(en_lines)
-        for ru_text, en_text in tqdm(zip(ru_lines, en_lines), total=len(ru_lines)):
-            ru_norm, en_norm = simple_pipeline(ru_text, en_text)
-            counter_ru.update(ru_norm)
-            counter_en.update(en_norm)
-
-    if config.vocab['max_tokens_ru'] is not None:
-        counter_ru = Counter({key: count for key, count in counter_ru.most_common()[:config.vocab['max_tokens_ru']]})
+    with open(config.vocab['train_corpus_en'], 'r') as corpus_en, open(config.vocab['train_corpus_de'], 'r') as corpus_de:
+        en_lines = corpus_en.readlines()
+        de_lines = corpus_de.readlines()
+        for en_text, de_text in tqdm(zip(en_lines, de_lines), total=len(en_lines)):
+            en_tokens, de_tokens = simple_pipeline(en_text, de_text)
+            counter_en.update(en_tokens)
+            counter_de.update(de_tokens)
 
     if config.vocab['max_tokens_en'] is not None:
         counter_en = Counter({key: count for key, count in counter_en.most_common()[:config.vocab['max_tokens_en']]})
+
+    if config.vocab['max_tokens_de'] is not None:
+        counter_de = Counter({key: count for key, count in counter_de.most_common()[:config.vocab['max_tokens_de']]})
 
     PAD = config.vocab['special_tokens']['padding']
     UNK = config.vocab['special_tokens']['unknown']
@@ -185,14 +138,82 @@ def build_vocab(config: ModuleType) -> None:
     EOS = config.vocab['special_tokens']['end']
 
     specials = [PAD, UNK, BOS, EOS]
-    vocab_ru, vocab_en = (vocab(counter_ru, specials=specials, min_freq=config.vocab['min_freq_ru']),
-                          vocab(counter_en, specials=specials, min_freq=config.vocab['min_freq_en']))
+    vocab_en, vocab_de = (vocab(counter_en, specials=specials, min_freq=config.vocab['min_freq_en']),
+                          vocab(counter_de, specials=specials, min_freq=config.vocab['min_freq_de']))
 
-    vocab_ru.set_default_index(vocab_ru[UNK])
     vocab_en.set_default_index(vocab_en[UNK])
+    vocab_de.set_default_index(vocab_de[UNK])
 
-    print(f'Russian vocab consist of {len(vocab_ru)} words')
     print(f'English vocab consist of {len(vocab_en)} words')
+    print(f'German vocab consist of {len(vocab_de)} words')
 
-    save_vocab(vocab_ru, config.vocab['path_ru'])
     save_vocab(vocab_en, config.vocab['path_en'])
+    save_vocab(vocab_de, config.vocab['path_de'])
+
+
+def build_dataset(config: ModuleType) -> Sequence[Dataset]:
+    train_dataset = Multi30k(corpus_en=config.dataset['train_corpus_en'],
+                             corpus_de=config.dataset['train_corpus_de'],
+                             vocab_en=config.dataset['vocab_en'],
+                             vocab_de=config.dataset['vocab_de'],
+                             translate_to=config.dataset['translate_to'],
+                             pad_token=config.dataset['pad_token'],
+                             start_token=config.dataset['start_token'],
+                             end_token=config.dataset['end_token'],
+                             max_seq_len=config.dataset['max_seq_len'],
+                             preprocess=config.dataset['preprocess'])
+    val_dataset = Multi30k(corpus_en=config.dataset['val_corpus_en'],
+                           corpus_de=config.dataset['val_corpus_de'],
+                           vocab_en=config.dataset['vocab_en'],
+                           vocab_de=config.dataset['vocab_de'],
+                           translate_to=config.dataset['translate_to'],
+                           pad_token=config.dataset['pad_token'],
+                           start_token=config.dataset['start_token'],
+                           end_token=config.dataset['end_token'],
+                           max_seq_len=config.dataset['max_seq_len'],
+                           preprocess=config.dataset['preprocess'])
+    test_dataset = Multi30k(corpus_en=config.dataset['test_corpus_en'],
+                            corpus_de=config.dataset['test_corpus_de'],
+                            vocab_en=config.dataset['vocab_en'],
+                            vocab_de=config.dataset['vocab_de'],
+                            translate_to=config.dataset['translate_to'],
+                            pad_token=config.dataset['pad_token'],
+                            start_token=config.dataset['start_token'],
+                            end_token=config.dataset['end_token'],
+                            max_seq_len=config.dataset['max_seq_len'],
+                            preprocess=config.dataset['preprocess'])
+    return train_dataset, val_dataset, test_dataset
+
+
+def build_dataloaders(config: ModuleType,
+                      datasets: Sequence[Dataset]) -> Sequence[DataLoader]:
+    def collate_fn(batch):
+        src_batch, trg_batch = [], []
+        for src_sample, trg_sample in batch:
+            src_batch.append(src_sample)
+            trg_batch.append(trg_sample)
+
+        return (pad_sequence(src_batch, padding_value=0, batch_first=True),
+                pad_sequence(trg_batch, padding_value=0, batch_first=True))
+    is_train = True
+    dataloaders = []
+    for dataset in datasets:
+        dataloaders.append(DataLoader(dataset,
+                                      shuffle=True if is_train else False,
+                                      batch_size=config.dataloader['batch_size'],
+                                      num_workers=config.dataloader['num_workers'],
+                                      collate_fn=collate_fn))
+        is_train = False
+    return dataloaders
+
+
+def get_datasets(config: ModuleType) -> Sequence[Dataset]:
+    return build_dataset(config)
+
+
+def get_dataloaders(config: ModuleType) -> Sequence[DataLoader]:
+    return build_dataloaders(config, build_dataset(config))
+
+
+def get_mapper(config: ModuleType) -> WordIDMapper:
+    return WordIDMapper(config)

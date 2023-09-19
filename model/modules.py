@@ -27,4 +27,4 @@ class ClassifyHead(nn.Module):
         self.w = nn.Linear(dim_model, trg_vocab_size)
 
     def forward(self, x: Tensor) -> Tensor:
-        return F.softmax(self.w(x), dim=-1)
+        return F.log_softmax(self.w(x), dim=-1)
