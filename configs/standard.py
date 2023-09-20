@@ -46,12 +46,12 @@ dataset_split = {
 }
 
 dataloader = {
-    'batch_size': 32,
+    'batch_size': 64,
     'num_workers': 2}
 
 model = {
-    'dim_model': 256,
-    'num_layers': 4,
+    'dim_model': 512,
+    'num_layers': 6,
     'num_heads': 8,
     'dim_ff': 2048,
     'dropout': 0.1,
