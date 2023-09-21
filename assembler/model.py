@@ -49,17 +49,12 @@ class TokenEmbedding(nn.Module):
 class TransformerModel(nn.Module):
     def __init__(self, config):
         super().__init__()
-        vocab_en = torch.load(config.vocab['path_en'])
-        vocab_de = torch.load(config.vocab['path_de'])
+        vocab_src = torch.load(config.vocab['path_src'])
+        vocab_trg = torch.load(config.vocab['path_trg'])
 
-        if config.dataset['translate_to'] == 'de':
-            src_vocab = len(vocab_en)
-            trg_vocab = len(vocab_de)
-        elif config.dataset['translate_to'] == 'en':
-            src_vocab = len(vocab_de)
-            trg_vocab = len(vocab_en)
-        else:
-            raise RuntimeError('Error in translate_to!')
+        src_vocab = len(vocab_src)
+        trg_vocab = len(vocab_trg)
+
         self.transformer = Transformer(d_model=config.model['dim_model'],
                                        nhead=config.model['num_heads'],
                                        num_encoder_layers=config.model['num_layers'],
@@ -69,7 +64,7 @@ class TransformerModel(nn.Module):
                                        batch_first=True)
         self.linear = nn.Linear(config.model['dim_model'], trg_vocab)
         self.src_tok_emb = TokenEmbedding(src_vocab, config.model['dim_model'])
-        self.tgt_tok_emb = TokenEmbedding(trg_vocab, config.model['dim_model'])
+        self.trg_tok_emb = TokenEmbedding(trg_vocab, config.model['dim_model'])
         self.positional_encoding = PositionalEncoding(config)
 
         self.device = torch.device(config.model['device'])
@@ -90,7 +85,7 @@ class TransformerModel(nn.Module):
                 trg_padding_mask: Tensor,
                 memory_key_padding_mask: Tensor):
         src_emb = self.positional_encoding(self.src_tok_emb(src))
-        trg_emb = self.positional_encoding(self.tgt_tok_emb(trg))
+        trg_emb = self.positional_encoding(self.trg_tok_emb(trg))
         outs = self.transformer(src_emb, trg_emb, src_mask, trg_mask, None,
                                 src_padding_mask, trg_padding_mask, memory_key_padding_mask)
         return self.linear(outs)

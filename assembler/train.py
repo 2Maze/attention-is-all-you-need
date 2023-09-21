@@ -47,6 +47,7 @@ def train_iter(epoch: int,
         optimizer.zero_grad()
         src_mask, trg_mask, src_padding_mask, trg_padding_mask = create_mask(src.transpose(0, 1),
                                                                              trg.transpose(0, 1)[:-1, :], device=device)
+
         logits = model(src=src,
                        trg=trg[:, :-1],
                        src_mask=src_mask,
@@ -96,10 +97,10 @@ def val_iter(epoch: int,
                        memory_key_padding_mask=src_padding_mask)
         probs = F.softmax(logits, dim=-1)
         total_loss += criterion(logits.reshape(-1, logits.shape[-1]), trg[:, 1:].reshape(-1))
-        bleu = metric(mapper.trg2words(probs.argmax(dim=-1)), [[sent] for sent in mapper.trg2words(trg)])
+        bleu = metric(mapper.trg_ids2words(probs.argmax(dim=-1)), [[sent] for sent in mapper.trg_ids2words(trg)])
         total_bleu += bleu
 
-    logger.add_text('Text/val', mapper.trg2words(probs.argmax(dim=-1)[0]), epoch)
+    logger.add_text('Text/val', mapper.trg_ids2words(probs.argmax(dim=-1)[0]), epoch)
     logger.add_scalar('Loss/val', total_loss / len(dataloader), epoch)
     logger.add_scalar('BLEU/val', total_bleu / len(dataloader), epoch)
 
@@ -123,6 +124,8 @@ def start_train(model: nn.Module,
                 clip_gradient: float) -> None:
     writer = SummaryWriter()
 
+    assert train_dataloader is not None
+
     for epoch in range(epochs):
         print(f'Epoch: {epoch}')
         train_iter(epoch=epoch,
@@ -132,12 +135,13 @@ def start_train(model: nn.Module,
                    optimizer=optimizer,
                    logger=writer,
                    clip_gradient=clip_gradient)
-        val_iter(epoch=epoch,
-                 model=model,
-                 dataloader=val_dataloader,
-                 criterion=criterion,
-                 mapper=mapper,
-                 logger=writer,
-                 metric=metric)
+        if val_dataloader is not None:
+            val_iter(epoch=epoch,
+                     model=model,
+                     dataloader=val_dataloader,
+                     criterion=criterion,
+                     mapper=mapper,
+                     logger=writer,
+                     metric=metric)
         save_model(epoch=epoch,
                    model=model)

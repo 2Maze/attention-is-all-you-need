@@ -6,12 +6,12 @@ reproducibility = {
 }
 
 vocab = {
-    'train_corpus_en': 'data/train.en',
-    'train_corpus_de': 'data/train.de',
-    'min_freq_en': 2,
-    'min_freq_de': 2,
-    'max_tokens_en': 25000,
-    'max_tokens_de': 25000,
+    'train_corpus_src': 'data/Multi30k/train.en',
+    'train_corpus_trg': 'data/Multi30k/train.de',
+    'min_freq_src': 2,
+    'min_freq_trg': 2,
+    'max_tokens_src': 25000,
+    'max_tokens_trg': 25000,
     'special_tokens':
     {
         'padding': '<pad>',
@@ -19,30 +19,24 @@ vocab = {
         'start': '<bos>',
         'end': '<eos>',
     },
-    'path_en': 'data/en.vocab',
-    'path_de': 'data/de.vocab',
+    'path_src': 'data/en.vocab',
+    'path_trg': 'data/de.vocab',
 }
 
 dataset = {
-    'train_corpus_en': 'data/train.en',
-    'train_corpus_de': 'data/train.de',
-    'val_corpus_en': 'data/val.en',
-    'val_corpus_de': 'data/val.de',
-    'test_corpus_en': 'data/test.en',
-    'test_corpus_de': 'data/test.de',
-    'vocab_en': vocab['path_en'],
-    'vocab_de': vocab['path_de'],
-    'translate_to': 'de',
+    'train_corpus_src': vocab['train_corpus_src'],
+    'train_corpus_trg': vocab['train_corpus_trg'],
+    'val_corpus_src': 'data/Multi30k/val.en',
+    'val_corpus_trg': 'data/Multi30k/val.de',
+    'test_corpus_src': 'data/Multi30k/test.en',
+    'test_corpus_trg': 'data/Multi30k/test.de',
+    'vocab_src': vocab['path_src'],
+    'vocab_trg': vocab['path_trg'],
     'max_seq_len': 60,
     'pad_token': vocab['special_tokens']['padding'],
     'start_token': vocab['special_tokens']['start'],
     'end_token': vocab['special_tokens']['end'],
     'preprocess': simple_pipeline,
-}
-
-dataset_split = {
-    'train': 0.7,
-    'validation': 0.3,
 }
 
 dataloader = {

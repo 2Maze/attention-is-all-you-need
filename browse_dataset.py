@@ -19,9 +19,14 @@ def main():
     config = load_config(args.config)
     train_dataloader, val_dataloader, test_dataloader = get_dataloaders(config)
     mapper = get_mapper(config)
-    src, trg = next(iter(train_dataloader))
+    src, trg = next(iter(val_dataloader))
+
+    print('We have train dataset: {}, val dataset: {}, test_dataset: {}'.format(train_dataloader is not None,
+                                                                                val_dataloader is not None,
+                                                                                test_dataloader is not None))
+
     print('_________________________')
-    for s, t in zip(mapper.src2words(src), mapper.trg2words(trg)):
+    for s, t in zip(mapper.src_ids2words(src), mapper.trg_ids2words(trg)):
         print('src: {}'.format(s))
         print('trg: {}'.format(t))
         print('_________________________')

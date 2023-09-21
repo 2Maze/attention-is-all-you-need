@@ -25,6 +25,7 @@ def main():
     criterion = build_criterion(config)
     optimizer = build_optimizer(config, model)
     metric = build_metric(config)
+    print(len(train_dataloader), len(val_dataloader))
     start_train(
         model=model,
         train_dataloader=train_dataloader,
