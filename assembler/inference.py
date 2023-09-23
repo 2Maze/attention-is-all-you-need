@@ -11,20 +11,11 @@ def inference_model(model_input_text: str,
                     config: ModuleType,
                     mapper: WordIDMapper,
                     model: nn.Module):
-    if config.dataset["translate_to"] == "en":
-        _, src_tokens = config.dataset['preprocess'](en_text='', de_text=model_input_text)
-        ids = [mapper.de_vocab[config.vocab['special_tokens']['start']]]
-        for token in src_tokens:
-            ids.append(mapper.de_vocab[token])
-        ids.append(mapper.de_vocab[config.vocab['special_tokens']['end']])
-    elif config.dataset["translate_to"] == "de":
-        src_tokens, _ = config.dataset['preprocess'](en_text=model_input_text, de_text='')
-        ids = [mapper.en_vocab[config.vocab['special_tokens']['start']]]
-        for token in src_tokens:
-            ids.append(mapper.en_vocab[token])
-        ids.append(mapper.en_vocab[config.vocab['special_tokens']['end']])
-    else:
-        raise RuntimeError('Error in translate_to!')
+    src_tokens, _ = config.dataset['preprocess'](src_text=model_input_text, trg_text='')
+    ids = [mapper.src_vocab[config.vocab['special_tokens']['start']]]
+    for token in src_tokens:
+        ids.append(mapper.src_vocab[token])
+    ids.append(mapper.src_vocab[config.vocab['special_tokens']['end']])
     src = torch.tensor([ids]).to(model.device)
     src_mask = (torch.zeros(len(ids), len(ids))).type(torch.bool).to(model.device)
     memory = model.encode(src, src_mask)

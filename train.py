@@ -8,11 +8,9 @@ from assembler.train import start_train
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Script for train model')
-    parser.add_argument('-c',
-                        '--config',
+    parser.add_argument('config',
                         type=str,
-                        help='Path to model config',
-                        default='configs/standard.py',)
+                        help='Path to model config')
     return parser.parse_args()
 
 
@@ -25,7 +23,6 @@ def main():
     criterion = build_criterion(config)
     optimizer = build_optimizer(config, model)
     metric = build_metric(config)
-    print(len(train_dataloader), len(val_dataloader))
     start_train(
         model=model,
         train_dataloader=train_dataloader,

@@ -96,7 +96,7 @@ class TransformerModel(nn.Module):
 
     def decode(self, trg: Tensor, memory: Tensor, trg_mask: Tensor):
         return self.transformer.decoder(self.positional_encoding(
-                                        self.tgt_tok_emb(trg)), memory,
+                                        self.trg_tok_emb(trg)), memory,
                                         trg_mask)
 
 

@@ -8,13 +8,14 @@ import spacy
 from typing import Sequence, Union
 from torch import Tensor
 from types import ModuleType
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from data.dataset import TranslateDataset
 from torchtext.vocab import Vocab, vocab
 from collections import Counter
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
+from sklearn.model_selection import train_test_split
 
 spacy_en = spacy.load('en_core_web_md')
 spacy_de = spacy.load('de_core_news_md')
@@ -102,8 +103,8 @@ def build_vocab(config: ModuleType) -> None:
     counter_src = Counter()
     counter_trg = Counter()
 
-    with open(config.vocab['train_corpus_src'], 'r') as corpus_en, open(config.vocab['train_corpus_trg'],
-                                                                        'r') as corpus_de:
+    with open(config.vocab['corpus_src'], 'r') as corpus_en, open(config.vocab['corpus_trg'],
+                                                                  'r') as corpus_de:
         src_lines = corpus_en.readlines()
         trg_lines = corpus_de.readlines()
         for src_text, trg_text in tqdm(zip(src_lines, trg_lines), total=len(src_lines)):
@@ -112,10 +113,10 @@ def build_vocab(config: ModuleType) -> None:
             counter_trg.update(trg_tokens)
 
     if config.vocab['max_tokens_src'] is not None:
-        counter_en = Counter({key: count for key, count in counter_src.most_common()[:config.vocab['max_tokens_src']]})
+        counter_src = Counter({key: count for key, count in counter_src.most_common()[:config.vocab['max_tokens_src']]})
 
     if config.vocab['max_tokens_trg'] is not None:
-        counter_de = Counter({key: count for key, count in counter_trg.most_common()[:config.vocab['max_tokens_trg']]})
+        counter_trg = Counter({key: count for key, count in counter_trg.most_common()[:config.vocab['max_tokens_trg']]})
 
     PAD = config.vocab['special_tokens']['padding']
     UNK = config.vocab['special_tokens']['unknown']
@@ -137,52 +138,72 @@ def build_vocab(config: ModuleType) -> None:
 
 
 def build_dataset(config: ModuleType) -> Sequence[Dataset]:
-    have_train = 'train_corpus_src' in config.dataset and 'train_corpus_trg' in config.dataset and os.path.exists(
-        config.dataset['train_corpus_src']) and os.path.exists(config.dataset['train_corpus_trg'])
-    have_val = 'val_corpus_src' in config.dataset and 'val_corpus_trg' in config.dataset and os.path.exists(
-        config.dataset['val_corpus_src']) and os.path.exists(config.dataset['val_corpus_trg'])
-    have_test = 'test_corpus_src' in config.dataset and 'test_corpus_trg' in config.dataset and os.path.exists(
-        config.dataset['test_corpus_src']) and os.path.exists(config.dataset['test_corpus_trg'])
+    if 'split' not in config.dataset:
+        have_train = 'train_corpus_src' in config.dataset and 'train_corpus_trg' in config.dataset and os.path.exists(
+            config.dataset['train_corpus_src']) and os.path.exists(config.dataset['train_corpus_trg'])
+        have_val = 'val_corpus_src' in config.dataset and 'val_corpus_trg' in config.dataset and os.path.exists(
+            config.dataset['val_corpus_src']) and os.path.exists(config.dataset['val_corpus_trg'])
+        have_test = 'test_corpus_src' in config.dataset and 'test_corpus_trg' in config.dataset and os.path.exists(
+            config.dataset['test_corpus_src']) and os.path.exists(config.dataset['test_corpus_trg'])
 
-    if have_train:
-        train_dataset = TranslateDataset(corpus_src=config.dataset['train_corpus_src'],
-                                         corpus_trg=config.dataset['train_corpus_trg'],
-                                         vocab_src=config.dataset['vocab_src'],
-                                         vocab_trg=config.dataset['vocab_trg'],
-                                         pad_token=config.dataset['pad_token'],
-                                         start_token=config.dataset['start_token'],
-                                         end_token=config.dataset['end_token'],
-                                         max_seq_len=config.dataset['max_seq_len'],
-                                         preprocess=config.dataset['preprocess'])
-    else:
-        train_dataset = None
+        if have_train:
+            train_dataset = TranslateDataset(corpus_src=config.dataset['train_corpus_src'],
+                                             corpus_trg=config.dataset['train_corpus_trg'],
+                                             vocab_src=config.dataset['vocab_src'],
+                                             vocab_trg=config.dataset['vocab_trg'],
+                                             pad_token=config.dataset['pad_token'],
+                                             start_token=config.dataset['start_token'],
+                                             end_token=config.dataset['end_token'],
+                                             max_seq_len=config.dataset['max_seq_len'],
+                                             preprocess=config.dataset['preprocess'])
+        else:
+            train_dataset = None
 
-    if have_val:
-        val_dataset = TranslateDataset(corpus_src=config.dataset['val_corpus_src'],
-                                       corpus_trg=config.dataset['val_corpus_trg'],
-                                       vocab_src=config.dataset['vocab_src'],
-                                       vocab_trg=config.dataset['vocab_trg'],
-                                       pad_token=config.dataset['pad_token'],
-                                       start_token=config.dataset['start_token'],
-                                       end_token=config.dataset['end_token'],
-                                       max_seq_len=config.dataset['max_seq_len'],
-                                       preprocess=config.dataset['preprocess'])
-    else:
-        val_dataset = None
+        if have_val:
+            val_dataset = TranslateDataset(corpus_src=config.dataset['val_corpus_src'],
+                                           corpus_trg=config.dataset['val_corpus_trg'],
+                                           vocab_src=config.dataset['vocab_src'],
+                                           vocab_trg=config.dataset['vocab_trg'],
+                                           pad_token=config.dataset['pad_token'],
+                                           start_token=config.dataset['start_token'],
+                                           end_token=config.dataset['end_token'],
+                                           max_seq_len=config.dataset['max_seq_len'],
+                                           preprocess=config.dataset['preprocess'])
+        else:
+            val_dataset = None
 
-    if have_test:
-        test_dataset = TranslateDataset(corpus_src=config.dataset['test_corpus_src'],
-                                        corpus_trg=config.dataset['test_corpus_trg'],
-                                        vocab_src=config.dataset['vocab_src'],
-                                        vocab_trg=config.dataset['vocab_trg'],
-                                        pad_token=config.dataset['pad_token'],
-                                        start_token=config.dataset['start_token'],
-                                        end_token=config.dataset['end_token'],
-                                        max_seq_len=config.dataset['max_seq_len'],
-                                        preprocess=config.dataset['preprocess'])
+        if have_test:
+            test_dataset = TranslateDataset(corpus_src=config.dataset['test_corpus_src'],
+                                            corpus_trg=config.dataset['test_corpus_trg'],
+                                            vocab_src=config.dataset['vocab_src'],
+                                            vocab_trg=config.dataset['vocab_trg'],
+                                            pad_token=config.dataset['pad_token'],
+                                            start_token=config.dataset['start_token'],
+                                            end_token=config.dataset['end_token'],
+                                            max_seq_len=config.dataset['max_seq_len'],
+                                            preprocess=config.dataset['preprocess'])
+        else:
+            test_dataset = None
+
+        return train_dataset, val_dataset, test_dataset
     else:
-        test_dataset = None
-    return train_dataset, val_dataset, test_dataset
+        split = config.dataset['split']
+        assert split['train'] + split['val'] == 1.
+        dataset = TranslateDataset(corpus_src=config.dataset['train_corpus_src'],
+                                   corpus_trg=config.dataset['train_corpus_trg'],
+                                   vocab_src=config.dataset['vocab_src'],
+                                   vocab_trg=config.dataset['vocab_trg'],
+                                   pad_token=config.dataset['pad_token'],
+                                   start_token=config.dataset['start_token'],
+                                   end_token=config.dataset['end_token'],
+                                   max_seq_len=config.dataset['max_seq_len'],
+                                   preprocess=config.dataset['preprocess'])
+        train_indices, val_indices = train_test_split(range(len(dataset)),
+                                                      train_size=split['train'],
+                                                      test_size=split['val'],
+                                                      random_state=config.reproducibility['seed'],
+                                                      )
+        return Subset(dataset, train_indices), Subset(dataset, val_indices), None
 
 
 def build_dataloaders(config: ModuleType,
@@ -205,7 +226,7 @@ def build_dataloaders(config: ModuleType,
         train_dataloader = None
 
     if datasets[1] is not None:
-        val_dataloader = DataLoader(datasets[0],
+        val_dataloader = DataLoader(datasets[1],
                                     shuffle=True,
                                     batch_size=config.dataloader['batch_size'],
                                     num_workers=config.dataloader['num_workers'],
@@ -214,7 +235,7 @@ def build_dataloaders(config: ModuleType,
         val_dataloader = None
 
     if datasets[2] is not None:
-        test_dataloader = DataLoader(datasets[0],
+        test_dataloader = DataLoader(datasets[2],
                                      shuffle=True,
                                      batch_size=config.dataloader['batch_size'],
                                      num_workers=config.dataloader['num_workers'],

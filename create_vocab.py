@@ -6,11 +6,9 @@ from assembler.data import build_vocab
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Script for creating vocabs')
-    parser.add_argument('-c',
-                        '--config',
+    parser.add_argument('config',
                         type=str,
-                        help='Path to model config',
-                        default='configs/standard.py',)
+                        help='Path to model config')
     return parser.parse_args()
 
 

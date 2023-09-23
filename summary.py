@@ -11,11 +11,9 @@ from thop import profile, clever_format
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Script for summary model')
-    parser.add_argument('-c',
-                        '--config',
+    parser.add_argument('config',
                         type=str,
-                        help='Path to model config',
-                        default='configs/standard.py', )
+                        help='Path to model config')
     parser.add_argument('-b',
                         '--bytes',
                         type=int,
