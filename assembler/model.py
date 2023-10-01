@@ -52,8 +52,8 @@ class TransformerModel(nn.Module):
         vocab_src = torch.load(config.vocab['path_src'])
         vocab_trg = torch.load(config.vocab['path_trg'])
 
-        src_vocab = len(vocab_src)
-        trg_vocab = len(vocab_trg)
+        self.src_vocab = len(vocab_src)
+        self.trg_vocab = len(vocab_trg)
 
         self.transformer = Transformer(d_model=config.model['dim_model'],
                                        nhead=config.model['num_heads'],
@@ -62,9 +62,9 @@ class TransformerModel(nn.Module):
                                        dim_feedforward=config.model['dim_ff'],
                                        dropout=config.model['dropout'],
                                        batch_first=True)
-        self.linear = nn.Linear(config.model['dim_model'], trg_vocab)
-        self.src_tok_emb = TokenEmbedding(src_vocab, config.model['dim_model'])
-        self.trg_tok_emb = TokenEmbedding(trg_vocab, config.model['dim_model'])
+        self.linear = nn.Linear(config.model['dim_model'], self.trg_vocab)
+        self.src_tok_emb = TokenEmbedding(self.src_vocab, config.model['dim_model'])
+        self.trg_tok_emb = TokenEmbedding(self.trg_vocab, config.model['dim_model'])
         self.positional_encoding = PositionalEncoding(config)
 
         self.device = torch.device(config.model['device'])
