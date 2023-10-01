@@ -7,6 +7,7 @@ from assembler.data import WordIDMapper
 from assembler.train import generate_square_subsequent_mask
 
 
+@torch.no_grad()
 def inference_model(model_input_text: str,
                     config: ModuleType,
                     mapper: WordIDMapper,
